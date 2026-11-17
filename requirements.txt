@@ -1,0 +1,18 @@
+# Smart Archive - local AI document archiving
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+pillow>=10.2
+img2pdf>=0.5.1
+python-multipart>=0.0.9
+requests>=2.31
+
+# Desktop mode: native window + native system folder chooser dialog
+pywebview>=5.1
+
+
+# Optional (webcam capture)
+opencv-python-headless>=4.9  # install only if you want webcam snapshots
+
+# Windows only: scanner support via WIA (Windows Image Acquisition)
+comtypes>=1.2; sys_platform == "win32"

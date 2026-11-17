@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Archive — AI Document Filing</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ===== Header ===== -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">🗂️</span>
+        <div>
+          <h1>Smart Archive</h1>
+          <span class="sub">Local AI document filing · <span id="model-label">gemma4:e2b</span></span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span id="ai-status" class="pill status-unknown" title="Ollama status">● checking…</span>
+        <button id="btn-settings" class="btn ghost" title="Settings">⚙ Settings</button>
+        <button id="btn-theme" class="btn ghost" title="Toggle dark/light">🌙</button>
+      </div>
+    </header>
+
+    <!-- ===== Main grid ===== -->
+    <main class="grid">
+
+      <!-- Sidebar: archive tree -->
+      <aside class="panel sidebar">
+        <div class="panel-head">
+          <h2>📁 Archive Tree</h2>
+          <button id="btn-refresh-tree" class="btn ghost small">↻</button>
+        </div>
+        <div class="panel-sub" id="archive-root-label">—</div>
+        <div id="tree" class="tree"></div>
+      </aside>
+
+      <!-- Center: upload + preview -->
+      <section class="panel center">
+        <div class="panel-head"><h2>📄 Document</h2></div>
+
+        <div id="dropzone" class="dropzone">
+          <div class="dz-icon">⬇️</div>
+          <p class="dz-main">Drag &amp; drop a scanned document here</p>
+          <p class="dz-sub">JPG · PNG · WEBP · BMP · TIFF — or use a capture source below</p>
+          <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff" hidden>
+          <div class="dz-actions">
+            <button class="btn primary" id="btn-browse">Browse file</button>
+            <button class="btn ghost" id="btn-scan">🖨 Scanner</button>
+            <button class="btn ghost" id="btn-webcam">📷 Webcam</button>
+          </div>
+        </div>
+
+        <div id="preview-area" class="preview-area hidden">
+          <div class="preview-wrap">
+            <img id="preview-img" alt="document preview">
+            <div id="preview-loading" class="preview-loading hidden">
+              <div class="spinner"></div>
+              <span id="loading-text">Gemma is reading your document…</span>
+              <span class="loading-note">CPU inference — this can take 30–120 s</span>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span id="preview-name">—</span>
+            <span id="preview-size"></span>
+            <button class="btn ghost small" id="btn-clear-doc">✕ Remove</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: AI plan + actions -->
+      <section class="panel right">
+        <div class="panel-head">
+          <h2>🤖 AI Filing Plan</h2>
+          <div class="mode-toggle" id="mode-toggle" title="Auto-Archive vs Review">
+            <span class="mode-label">Review</span>
+            <label class="switch">
+              <input type="checkbox" id="auto-mode">
+              <span class="slider"></span>
+            </label>
+            <span class="mode-label">Auto</span>
+          </div>
+        </div>
+
+        <div id="plan-empty" class="empty">
+          Upload a document, then Gemma will read it and propose where to file it.
+        </div>
+
+        <div id="plan" class="plan hidden">
+          <div class="field"><label>Title</label><input id="p-title" type="text"></div>
+          <div class="row2">
+            <div class="field"><label>Type</label><input id="p-type" type="text"></div>
+            <div class="field"><label>Date</label><input id="p-date" type="date"></div>
+          </div>
+          <div class="field">
+            <label>Target folder</label>
+            <input id="p-target" type="text" list="folder-list" placeholder="e.g. Finance/Invoices">
+            <datalist id="folder-list"></datalist>
+            <label class="check"><input type="checkbox" id="p-create"> Create this folder if missing</label>
+          </div>
+          <div class="field"><label>PDF filename</label><input id="p-filename" type="text"></div>
+          <div class="summaries">
+            <div class="field"><label>Summary (AR)</label><p id="p-sum-ar" class="summary" dir="rtl"></p></div>
+            <div class="field"><label>Summary (EN)</label><p id="p-sum-en" class="summary"></p></div>
+          </div>
+          <div class="plan-footer">
+            <span id="p-confidence" class="pill"></span>
+            <button class="btn primary" id="btn-archive">💾 Save PDF to Archive</button>
+          </div>
+        </div>
+
+        <div id="result-banner" class="banner hidden"></div>
+      </section>
+    </main>
+
+    <!-- ===== Activity log ===== -->
+    <footer class="panel activity">
+      <div class="panel-head">
+        <h2>🕘 Recent Archives</h2>
+        <button id="btn-clear-activity" class="btn ghost small">Clear</button>
+      </div>
+      <ul id="activity-list" class="activity-list"></ul>
+    </footer>
+  </div>
+
+  <!-- Settings modal -->
+  <dialog id="settings-modal">
+    <h2>Settings</h2>
+    <div class="field"><label>Archive folder (root)</label>
+      <div class="input-row">
+        <input id="s-root" type="text" placeholder="/home/user/Documents/Archive">
+        <button class="btn ghost" id="s-browse" type="button">📂 Browse</button>
+      </div></div>
+    <div class="row2">
+      <div class="field"><label>Ollama URL</label><input id="s-ollama" type="text"></div>
+      <div class="field"><label>Model</label><input id="s-model" type="text"></div>
+    </div>
+    <div class="field"><label>Language hint</label>
+      <select id="s-lang"><option value="auto">Auto</option><option value="ar">Arabic</option><option value="en">English</option></select></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="s-cancel">Cancel</button>
+      <button class="btn primary" id="s-save">Save</button>
+    </div>
+  </dialog>
+
+  <!-- Folder browser modal -->
+  <dialog id="browser-modal">
+    <h2>📂 Choose archive folder</h2>
+    <div class="browse-bar">
+      <button class="btn ghost small" id="b-up" type="button">⬆ Up</button>
+      <code id="b-current" class="b-current"></code>
+    </div>
+    <ul id="b-list" class="b-list"></ul>
+    <div class="modal-actions">
+      <button class="btn ghost" id="b-cancel">Cancel</button>
+      <button class="btn primary" id="b-select">Select this folder</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
