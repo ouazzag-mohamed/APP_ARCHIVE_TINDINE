@@ -4,6 +4,7 @@ uvicorn[standard]>=0.29
 pydantic>=2.6
 pillow>=10.2
 img2pdf>=0.5.1
+pymupdf>=1.24,<2  # PDF page rendering for AI vision (kept light; v2 pulls ONNX extras)
 python-multipart>=0.0.9
 requests>=2.31
 

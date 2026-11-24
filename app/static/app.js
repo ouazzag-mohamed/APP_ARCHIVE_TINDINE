@@ -225,7 +225,17 @@ async function uploadFile(file) {
 function setDoc(d) {
   state.doc = d;
   $("preview-area").classList.remove("hidden");
-  $("preview-img").src = `/api/file?path=${encodeURIComponent(d.path)}&t=${Date.now()}`;
+  const isPdf = /\.pdf$/i.test(d.path);
+  const url = `/api/file?path=${encodeURIComponent(d.path)}&t=${Date.now()}`;
+  if (isPdf) {
+    $("preview-img").classList.add("hidden");
+    $("preview-pdf").classList.remove("hidden");
+    $("preview-pdf").src = url;
+  } else {
+    $("preview-pdf").classList.add("hidden");
+    $("preview-img").classList.remove("hidden");
+    $("preview-img").src = url;
+  }
   $("preview-name").textContent = d.name;
   $("preview-size").textContent = `${(d.size / 1024).toFixed(0)} KB`;
 }

@@ -14,11 +14,11 @@ Everything runs **100% locally on CPU** — no GPU, no cloud, no data leaves you
 | Feature | Detail |
 |---|---|
 | Archive folder integration | Configure any local root folder; full tree scan with file counts; live sidebar tree; click a folder to pre-fill the target |
-| Upload & capture | Drag & drop (JPG/PNG/WEBP/BMP/TIFF), file browser, scanner (**WIA on Windows, SANE on Linux**), **webcam snapshot** (OpenCV) |
+| Upload & capture | Drag & drop **JPG/PNG/WEBP/BMP/TIFF/PDF**, file browser, scanner (**WIA on Windows, SANE on Linux**), **webcam snapshot** (OpenCV) |
 | AI vision | Image + folder tree sent to `gemma4:e2b` on Ollama; Arabic & English reading; structured JSON plan |
 | Tool calling | `save_pdf_to_archive` function exposed to the model (`/api/tool-call`) plus a deterministic execution pipeline |
 | Auto / Review mode | Toggle switch: Auto files instantly; Review pre-fills folder + filename for one-click edit/confirm |
-| PDF creation | EXIF-rotated, high-quality JPEG-inside-PDF via `img2pdf`; auto date-prefix & filename sanitization; collision-safe naming |
+| PDF creation | EXIF-rotated, high-quality JPEG-inside-PDF via `img2pdf`; **existing PDFs are filed as-is**; auto date-prefix & filename sanitization; collision-safe naming |
 | Safety | All writes constrained inside the archive root (path-escape protection) |
 | UX | Dark/light mode, CPU-friendly spinners, success banner with **exact saved path**, Recent Archives log with quick-open links |
 | Persistence | `config.json` settings + `activity_log.json` history |
@@ -93,14 +93,18 @@ scanimage -L          # verify your scanner is detected
 ```
 
 **Scanner support on Windows 11:** works automatically via **WIA (Windows Image Acquisition)** —
-`comtypes` is installed by `requirements.txt`. The 🖨 Scanner button opens your scanner's own
-native dialog (device, color mode, DPI), and the scanned image lands directly in the app.
+`comtypes` is installed by `requirements.txt`. The 🖨 Scanner button first tries a single-pass
+native acquisition (`ShowAcquireImage`), then falls back to the device chooser + acquisition
+wizard. Either way you get your scanner's real settings dialog (color mode, DPI…). If it fails,
+verify the scanner once in the Windows **Scan** app — that confirms the WIA driver is installed.
 
 ## 🖥️ Usage
 
 1. **Settings ⚙** → set your Archive folder (e.g. `/home/you/Documents/Archive`). The full
    existing tree is scanned and shown in the sidebar.
-2. **Add a document** → drag & drop a scan, browse, or use 🖨 Scanner / 📷 Webcam.
+2. **Add a document** → drag & drop a scan **or PDF**, browse, or use 🖨 Scanner / 📷 Webcam.
+   PDFs are supported too: their first pages are rendered for the AI, and the original PDF is
+   filed into the archive unchanged.
 3. Gemma reads the document (AR/EN) and returns: title, type, date, language, target folder,
    standardized PDF filename, and AR/EN summaries.
    - **Review Mode** (default): fields are pre-filled — edit anything, pick a tree folder,
@@ -118,7 +122,7 @@ native dialog (device, color mode, DPI), and the scanned image lands directly in
 | `/api/settings` | GET/PUT | View/update config (archive root, model, mode…) |
 | `/api/tree` | GET | Full archive tree |
 | `/api/folders/create` | POST | Create a subfolder |
-| `/api/upload` | POST (multipart) | Upload a document image |
+| `/api/upload` | POST (multipart) | Upload a document image **or PDF** |
 | `/api/capture/scan` · `/api/capture/webcam` | POST | Acquire from scanner / webcam |
 | `/api/analyze` | POST | Gemma vision → filing plan (JSON) |
 | `/api/tool-call` | POST | Gemma native `save_pdf_to_archive` tool-call confirmation |

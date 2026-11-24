@@ -69,6 +69,14 @@ def image_to_pdf(image_path: str, out_pdf: Path) -> Path:
     return out_pdf
 
 
+def document_to_pdf(src_path: str, out_pdf: Path) -> Path:
+    """Convert an image to PDF; for an existing PDF, keep the original file as-is."""
+    if Path(src_path).suffix.lower() == ".pdf":
+        shutil.copy2(src_path, out_pdf)
+        return out_pdf
+    return image_to_pdf(src_path, out_pdf)
+
+
 def unique_path(directory: Path, filename: str) -> Path:
     p = directory / filename
     if not p.exists():
@@ -88,13 +96,13 @@ def save_to_archive(image_path: str, target_dir: str, filename: str,
     directory = resolve_dir(archive_root, target_dir, create_folder)
     fname = normalize_filename(filename)
     out = unique_path(directory, fname)
-    image_to_pdf(image_path, out)
+    document_to_pdf(image_path, out)
     return {
         "saved_path": str(out),
         "relative_path": str(out.relative_to(Path(archive_root).resolve())),
         "folder": str(directory),
         "filename": out.name,
-        "created_folder": create_folder and not Path(target_dir).exists() if isinstance(target_dir, str) else False,
+        "created_folder": directory.name == sanitize_component(Path(target_dir).name) and create_folder,
         "size": out.stat().st_size,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
     }

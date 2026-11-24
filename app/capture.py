@@ -47,26 +47,43 @@ def list_scanners() -> list[str]:
 
 def _scan_windows(dpi: int = 300) -> str:
     """
-    Windows: WIA (Windows Image Acquisition) via comtypes.
-    Opens the scanner's native dialog (device choice, color mode, DPI...),
-    then grabs the acquired image into a temp file.
+    Windows: WIA (Windows Image Acquisition) via comtypes. Tries, in order:
+      1. CommonDialog.ShowAcquireImage -> native scan dialog -> ImageFile.SaveFile  (most reliable)
+      2. ShowSelectDevice + ShowAcquisitionWizard -> grab the temp file the wizard writes
+    Raises a clear error if no WIA scanner/driver is present.
     """
     import comtypes.client
 
     tmp_dir = Path(tempfile.gettempdir())
-    before = {p.name for p in tmp_dir.glob("*.bmp")} | {p.name for p in tmp_dir.glob("*.png")}
+    out = tmp_dir / f"scan_{int(time.time()*1000)}.png"
+    # WIA PNG format GUID (used by ShowAcquireImage)
+    PNG_FORMAT = "{B96B3CAF-0728-11D3-9D7B-0000F81EF32E}"
 
     dialog = comtypes.client.CreateObject("WIA.CommonDialog")
-    device = dialog.ShowSelectDevice()          # native chooser (auto-skips if 1 device)
-    if device is None:
-        raise RuntimeError("No scanner selected")
-    images = dialog.ShowAcquisitionWizard(device)   # native scan dialog
-    if images is None or images.Count == 0:
-        raise RuntimeError("Scan cancelled or empty")
+    before = {p.name for p in tmp_dir.glob("*.bmp")} | {p.name for p in tmp_dir.glob("*.png")}
 
-    # Save the first acquired image via WIA's own SaveFile; fall back to
-    # detecting the wizard's temp file in %TEMP%.
-    out = tmp_dir / f"scan_{int(time.time()*1000)}.png"
+    # --- Attempt 1: single-shot acquisition with native settings dialog ---
+    try:
+        # (DeviceType=1 Scanner, Intent=1 Color, Bias=0, FormatID=PNG, AlwaysSelectDevice=False)
+        image = dialog.ShowAcquireImage(1, 1, 0, PNG_FORMAT, False)
+        if image is not None:
+            try:
+                image.SaveFile(str(out))
+            except Exception:
+                pass
+            if out.exists() and out.stat().st_size > 0:
+                return str(out)
+    except Exception:
+        pass  # fall through to wizard mode
+
+    # --- Attempt 2: device chooser + acquisition wizard ---
+    device = dialog.ShowSelectDevice()
+    if device is None:
+        raise RuntimeError("No scanner selected (is the scanner driver installed in Windows?)")
+    images = dialog.ShowAcquisitionWizard(device)
+    if images is None or images.Count == 0:
+        raise RuntimeError("Scan cancelled or no pages acquired")
+
     try:
         images.Item(1).SaveFile(str(out))
         if out.exists() and out.stat().st_size > 0:
@@ -74,12 +91,12 @@ def _scan_windows(dpi: int = 300) -> str:
     except Exception:
         pass
 
-    # Fallback: the wizard wrote acquired images into %TEMP%; find the new one
+    # --- Fallback: the wizard writes images into %TEMP%; pick the newest new file ---
     after = [p for p in list(tmp_dir.glob("*.bmp")) + list(tmp_dir.glob("*.png"))
              if p.name not in before]
     if not after:
-        raise RuntimeError("Scanner did not return an image file")
-
+        raise RuntimeError(
+            "Scanner returned no image. Verify the scanner works in the Windows 'Scan' app.")
     newest = max(after, key=lambda p: p.stat().st_mtime)
     out.write_bytes(newest.read_bytes())
     try:

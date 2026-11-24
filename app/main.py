@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, tree_scanner, archiver, ollama_client, capture
+from . import config, tree_scanner, archiver, ollama_client, capture, pdf_utils
 
 ROOT = Path(__file__).resolve().parent.parent
 UPLOADS = ROOT / "uploads"
@@ -18,7 +18,7 @@ UPLOADS.mkdir(exist_ok=True)
 
 app = FastAPI(title="Smart Archive", version="1.0.0")
 
-ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
+ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".pdf"}
 
 
 def get_tree() -> dict:
@@ -143,6 +143,7 @@ def browse_dirs(path: str = ""):
 
 @app.get("/api/file")
 def get_file(path: str):
+    p = Path(path).resolve()
     allowed = {UPLOADS.resolve(), Path(config.get("archive_root")).resolve()}
     if not any(p == a or a in p.parents for a in allowed):
         raise HTTPException(403, "Path not allowed")
@@ -168,8 +169,12 @@ def analyze(body: dict = Body(...)):
     if not ok:
         raise HTTPException(503, msg)
 
-    plan = ollama_client.analyze_document(
-        image_path, _tree_summary(), datetime.now().strftime("%Y-%m-%d"))
+    pages = pdf_utils.vision_images(image_path)
+    try:
+        plan = ollama_client.analyze_document(
+            pages, _tree_summary(), datetime.now().strftime("%Y-%m-%d"))
+    finally:
+        pdf_utils.cleanup_temp(pages, image_path)
     plan.pop("_raw", None)
 
     # Validate + enrich
@@ -238,8 +243,12 @@ def tool_call(body: dict = Body(...)):
     image_path = body.get("path")
     if not image_path or not Path(image_path).is_file():
         raise HTTPException(400, "Provide a valid uploaded image path")
-    plan = ollama_client.confirm_with_tool(
-        image_path, _tree_summary(), datetime.now().strftime("%Y-%m-%d"))
+    pages = pdf_utils.vision_images(image_path)
+    try:
+        plan = ollama_client.confirm_with_tool(
+            pages, _tree_summary(), datetime.now().strftime("%Y-%m-%d"))
+    finally:
+        pdf_utils.cleanup_temp(pages, image_path)
     return plan
 
 

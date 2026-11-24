@@ -153,8 +153,9 @@ TOOLS = [
 ]
 
 
-def analyze_document(image_path: str, tree_summary: str, today: str) -> dict:
-    """Send the document image + archive tree to Gemma and return the structured plan."""
+def analyze_document(image_paths: list[str], tree_summary: str, today: str) -> dict:
+    """Send document page image(s) + archive tree to Gemma and return the structured plan."""
+    images = [encode_image(p) for p in image_paths]
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {
@@ -162,10 +163,10 @@ def analyze_document(image_path: str, tree_summary: str, today: str) -> dict:
             "content": (
                 f"Today's date: {today}\n\n"
                 f"=== ARCHIVE FOLDER TREE ===\n{tree_summary}\n\n"
-                "=== DOCUMENT IMAGE ATTACHED ===\n"
-                "Analyze the image and return the JSON plan now."
+                f"=== DOCUMENT IMAGE(S) ATTACHED ({len(images)} page(s)) ===\n"
+                "Analyze the document and return the JSON plan now."
             ),
-            "images": [encode_image(image_path)],
+            "images": images,
         },
     ]
     resp = chat(messages, timeout=900, num_predict=1200)
@@ -175,12 +176,13 @@ def analyze_document(image_path: str, tree_summary: str, today: str) -> dict:
     return plan
 
 
-def confirm_with_tool(plan: dict, image_path: str, tree_summary: str, today: str) -> dict:
+def confirm_with_tool(plan: dict, image_paths: list[str], tree_summary: str, today: str) -> dict:
     """
     Second-stage tool-calling turn: give the model the save_pdf_to_archive tool and let it
     finalize the filing decision. Returns {'tool_called': bool, 'args': {...}}.
     On models without native tool support this gracefully returns tool_called=False.
     """
+    images = [encode_image(p) for p in image_paths]
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {
@@ -191,7 +193,7 @@ def confirm_with_tool(plan: dict, image_path: str, tree_summary: str, today: str
                 "save_pdf_to_archive with target_dir, filename and create_folder. "
                 "Then reply with the final JSON plan only."
             ),
-            "images": [encode_image(image_path)],
+            "images": images,
         },
     ]
     try:
