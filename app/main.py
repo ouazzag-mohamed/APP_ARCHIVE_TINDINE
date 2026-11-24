@@ -89,9 +89,18 @@ def create_folder(body: dict = Body(...)):
 # ---------------- Upload / capture ----------------
 
 def _store_upload(data: bytes, filename: str) -> str:
-    ext = Path(filename).suffix.lower() or ".png"
+    ext = Path(filename).suffix.lower()
+    looks_pdf = data[:5] == b"%PDF-"
+    # Content sniffing: scanners/browsers sometimes send files without a usable extension
+    if not ext:
+        ext = ".pdf" if looks_pdf else ".png"
+    elif ext not in ALLOWED_EXT and looks_pdf:
+        ext = ".pdf"
     if ext not in ALLOWED_EXT:
-        raise HTTPException(400, f"Unsupported file type: {ext}")
+        raise HTTPException(
+            400,
+            f"Unsupported file type '{ext or 'unknown'}'. Allowed: "
+            + ", ".join(sorted(ALLOWED_EXT)))
     path = UPLOADS / f"{uuid.uuid4().hex}{ext}"
     path.write_bytes(data)
     return str(path)
